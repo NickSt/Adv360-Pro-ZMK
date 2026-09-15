@@ -25,6 +25,35 @@ Two properties worth knowing:
 Branch switching is clean: `firmware/` is gitignored and `config/version.dtsi` is generated
 during `make` then `git checkout`-reverted, so neither leaves a stray diff.
 
+## Syncing with upstream
+
+`upstream` is `KinesisCorporation/Adv360-Pro-ZMK`, `origin` is `NickSt/Adv360-Pro-ZMK`. Updates
+flow `stock` → `V3.0` → `primary-mode`:
+
+```sh
+git fetch upstream
+git checkout stock        && git merge --ff-only upstream/V3.0
+git checkout V3.0         && git merge stock
+git checkout primary-mode && git merge V3.0
+```
+
+Nothing is silently overwritten — merges conflict, they don't clobber. But the conflict surface
+is lopsided, and worth knowing before starting:
+
+| File | Our divergence | Upstream churn | Expect |
+|---|---|---|---|
+| `config/adv360.keymap` | 72+/71− on an 89-line file | 4 of last 20 commits | conflicts every sync |
+| `config/info.json` | 81+/79− | 2 of last 20 | conflicts every sync |
+| `CLAUDE.md`, `.gitattributes` | new files | never existed upstream | never conflict |
+
+Our keymap is effectively a full rewrite of upstream's, so resolve it by **keeping ours** and
+hand-porting anything genuinely new (added includes, new behavior definitions, board changes) —
+not by accepting theirs. `config/info.json` only feeds the web GUI and never reaches the
+firmware, so `--ours` is always safe there.
+
+Prefer putting shared fixes and docs on `V3.0` and merging forward, rather than committing them
+to `primary-mode` directly — otherwise a build run from `V3.0` or `stock` re-breaks.
+
 ## Editing the keymap
 
 `config/adv360.keymap` is **the only file to edit** for keymap changes.
@@ -93,10 +122,32 @@ There are no combos anywhere in the repo. If adding any, keep them off the GAME 
 
 ZMK source is pinned in `config/west.yml` to a **fork**: `refil/zmk` @ `adv360-z3.5-2`.
 
-- `make` — both halves via Docker/podman. `make left` — left only, faster. Needs Docker Desktop
-  running; on Windows run from WSL2. Output lands in `firmware/`.
-- **Or just push the branch** and download the `firmware-clique` artifact from Actions. Usually
-  faster than getting a local container going, and it compiles both halves.
+- `make` — both halves. `make left` — left only, faster. Output lands in `firmware/`.
+- **Or just push the branch** and download the `firmware-clique` artifact from Actions. Needs
+  nothing installed locally and compiles both halves.
+
+Local builds work on Windows with **podman**, run from **Git Bash** — no Docker Desktop, and no
+WSL2 shell (`podman machine` uses WSL2 underneath, but you never interact with it). One-time
+setup is `scoop install make` plus `podman machine start`.
+
+The first `make` builds the container image — pulls `zmkfirmware/zmk-build-arm:stable`, then
+`west init/update/zephyr-export` — and takes several minutes. The Zephyr tree is baked into the
+image, so later runs are just the compile, about a minute.
+
+Two Windows fixes are already in the repo. Don't undo them:
+
+- `export MSYS_NO_PATHCONV=1` at the top of the `Makefile`. Without it Git Bash rewrites the
+  container-side half of `-v host:/app/config` into a Windows path, and podman fails with
+  `invalid option type "\Program Files\Git\app\config;ro"`.
+- `.gitattributes` pins `*.sh` to LF. Under `core.autocrlf=true` the scripts check out CRLF and
+  the container dies immediately with `/usr/bin/env: 'bash\r': No such file or directory`.
+  CI never hit this — GitHub's checkout doesn't convert line endings.
+
+The `:z` SELinux mount flags the `Makefile` adds on non-Darwin hosts are harmless under podman
+on WSL, and `$(PWD)` as a POSIX path (`/d/source/...`) is accepted as a mount source.
+
+Sizes, as a reference point when adding features: left **32.8%** of 792 KB flash and 29.1% RAM,
+right **22.4%** and 12.7%.
 
 Validating a keymap change without a container: every `&kp` keycode must resolve against
 `app/include/dt-bindings/zmk/keys.h` in the pinned fork, and every `&macro_*` against
