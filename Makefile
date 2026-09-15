@@ -1,3 +1,7 @@
+# Git Bash rewrites the container-side half of a -v flag into a Windows path when
+# it invokes the native podman.exe, which podman then rejects. Disable that.
+export MSYS_NO_PATHCONV=1
+
 DOCKER := $(shell { command -v podman || command -v docker; })
 TIMESTAMP := $(shell date -u +"%Y%m%d%H%M")
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
