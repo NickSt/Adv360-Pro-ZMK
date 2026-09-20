@@ -118,6 +118,42 @@ On `primary-mode`:
 There are no combos anywhere in the repo. If adding any, keep them off the GAME positions
 (28–34, 46–51, 60–64 and the left thumb cluster).
 
+`primary-mode` also carries four `status = "reserved"` placeholder layers (`extra1`–`extra4`,
+indices 5–8) after GAME. They are the spare slots ZMK Studio / Clique needs to add layers at
+runtime — normal builds ignore them entirely, Studio-enabled builds expose them. Upstream shipped
+four of these; `9b7d63f` removed them, which silently capped Clique at the layers already defined.
+
+**Reserved layers must stay last**, because layer index is devicetree order. That's why they live
+on `primary-mode` rather than `V3.0`: a baseline branch can't hold them, since any downstream
+branch adding a real layer would have to insert it *before* the reserved block and would collide
+on every merge. A new real layer goes after GAME but **before** `extra1`.
+
+## Changing bindings without reflashing
+
+The left half is built with ZMK Studio enabled, so most binding changes need no rebuild:
+plug the **left** half in over USB, open [Clique](https://clique.kinesis-ergo.com/) or
+[zmk.studio](https://zmk.studio), and unlock with **`Mod` + `Esc`** (`&studio_unlock`, mod layer
+pos 28). Clique is Kinesis's own UI built on ZMK Studio's protocol — the two are interchangeable
+clients, not different mechanisms. The Coutsos keymap-editor is a different thing again: it edits
+*repo files*, never the keyboard, and still needs a flash.
+
+Studio can reassign keys on existing layers, rename layers, and enable reserved ones, using any
+behavior compiled into the firmware — including every macro in `config/macros.dtsi`, bound or not,
+since Studio builds auto-enable `ZMK_BEHAVIORS_KEEP_ALL`. It **cannot** define new behaviors,
+combos, or conditional layers, or change Kconfig. Those still need a rebuild and flash.
+
+Two traps:
+
+- **Studio settings override the firmware keymap, and keep overriding it.** Once anything is saved
+  in Studio, later `.keymap` changes you flash will not take effect until you use **Restore Stock
+  Settings** in the Studio/Clique UI. This interacts badly with per-branch CI builds: flash an
+  `experiment/*` branch with Studio settings stored and you'll see the old keymap and think the
+  build failed. Restore Stock Settings before evaluating a freshly flashed branch.
+- **Studio has no export/import and no profiles** ([zmk-studio#124](https://github.com/zmkfirmware/zmk-studio/issues/124)).
+  "Restore Stock Settings" is a wipe, not a restore. Nothing tweaked only in Studio exists anywhere
+  but on that keyboard. This repo is the profile system — a branch per variant, built by CI. Treat
+  Studio as a scratchpad and port anything worth keeping back into the keymap.
+
 ## Build
 
 ZMK source is pinned in `config/west.yml` to a **fork**: `refil/zmk` @ `adv360-z3.5-2`.
