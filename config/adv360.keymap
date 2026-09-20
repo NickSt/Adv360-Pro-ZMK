@@ -85,5 +85,25 @@
 &kp I      &kp LALT   &kp Z   &kp X   &kp C           &kp SPACE  &kp LSHFT  &kp LCTRL  &trans  &trans  &trans           &trans  &trans  &trans     &trans     &trans
             >;
         };
+
+        extra1 {
+            display-name = "Red";
+            status = "reserved";
+        };
+
+        extra2 {
+            display-name = "Purple";
+            status = "reserved";
+        };
+
+        extra3 {
+            display-name = "Cyan";
+            status = "reserved";
+        };
+
+        extra4 {
+            display-name = "Yellow";
+            status = "reserved";
+        };
     };
 };
